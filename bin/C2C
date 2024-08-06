@@ -30,18 +30,20 @@ from comp2comp.utils.process import process_3d
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
+
 ### AAA Pipeline
 
 def AAAPipelineBuilder(path, args):
     pipeline = InferencePipeline(
-      [
-        AxialCropperPipelineBuilder(path, args),
-        aaa.AortaSegmentation(),
-        aaa.AortaDiameter(),
-        aaa.AortaMetricsSaver()
-      ]
+        [
+            AxialCropperPipelineBuilder(path, args),
+            aaa.AortaSegmentation(),
+            aaa.AortaDiameter(),
+            aaa.AortaMetricsSaver()
+        ]
     )
     return pipeline
+
 
 def MuscleAdiposeTissuePipelineBuilder(args):
     pipeline = InferencePipeline(
@@ -71,8 +73,8 @@ def SpinePipelineBuilder(path, args):
         [
             io.DicomToNifti(path) if args.input_type == "dicom" else io.NiftiReader(path),
             spine.SpineSegmentation(args.spine_model, save=True),
-            orientation.ToCanonical(),
-            spine.SpineComputeROIs(args.spine_model),
+            orientation.ToCanonical(),  # Make it RAS+
+            spine.SpineComputeROIs(args.spine_model),  # TODO continue from here:)
             spine.SpineMetricsSaver(),
             spine.SpineCoronalSagittalVisualizer(format="png"),
             spine.SpineReport(format="png"),
@@ -209,11 +211,11 @@ def argument_parser():
     # Aortic calcium
     aortic_calcium = subparsers.add_parser(
         "aortic_calcium", parents=[base_parser])
-    
+
     aortic_calcium.add_argument(
         "--threshold", default="adaptive", type=str
     )
-    
+
     # Contrast phase
     contrast_phase_parser = subparsers.add_parser(
         "contrast_phase", parents=[base_parser]
@@ -287,3 +289,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # How to run: spine_muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations

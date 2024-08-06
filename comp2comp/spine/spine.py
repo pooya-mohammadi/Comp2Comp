@@ -266,12 +266,14 @@ class AxialCropper(InferenceClass):
                 2
             ].max()
         except:
+            print(f"[WARNING] upper_level_dex: {self.upper_level_index} was not found! Setting to {segmentation_data.shape[2]}")
             upper_level_index = segmentation_data.shape[2]
         try:
             lower_level_index = np.where(segmentation_data == self.lower_level_index)[
                 2
             ].min()
         except:
+            print(f"[WARNING] lower_level_index: {self.lower_level_index} was not found! Setting to 0")
             lower_level_index = 0
         segmentation = segmentation.slicer[:, :, lower_level_index:upper_level_index]
         inference_pipeline.segmentation = segmentation

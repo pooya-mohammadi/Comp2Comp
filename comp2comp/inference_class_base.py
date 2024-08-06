@@ -11,7 +11,7 @@ class InferenceClass:
     def __init__(self):
         pass
 
-    def __call__(self) -> Dict:
+    def __call__(self, inference_pipeline) -> Dict:
         raise NotImplementedError
 
     def __repr__(self):
