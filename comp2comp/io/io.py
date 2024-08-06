@@ -124,6 +124,58 @@ class DicomToNifti(InferenceClass):
         return {}
 
 
+class NiftiReader(InferenceClass):
+    """Reads NiftiFile"""
+
+    def __init__(self, input_path: Union[str, Path], pipeline_name=None, save=True):
+        super().__init__()
+        self.input_path = Path(input_path)
+        self.save = save
+        self.pipeline_name = pipeline_name
+
+    def __call__(self, inference_pipeline):
+        if os.path.exists(
+            os.path.join(
+                inference_pipeline.output_dir, "segmentations", "converted_dcm.nii.gz"
+            )
+        ):
+            return {}
+        if hasattr(inference_pipeline, "medical_volume"):
+            return {}
+        output_dir = inference_pipeline.output_dir
+        segmentations_output_dir = os.path.join(output_dir, "segmentations")
+        os.makedirs(segmentations_output_dir, exist_ok=True)
+
+        # if self.input_path is a folder
+        # if self.input_path.is_dir():
+        #     ds = dicom_series_to_nifti(
+        #         self.input_path,
+        #         output_file=os.path.join(
+        #             segmentations_output_dir, "converted_dcm.nii.gz"
+        #         ),
+        #         reorient_nifti=False,
+        #         pipeline_name=self.pipeline_name,
+        #     )
+        #     inference_pipeline.dicom_series_path = str(self.input_path)
+        #     inference_pipeline.dicom_ds = ds
+        if str(self.input_path).endswith(".nii"):
+            shutil.copy(
+                self.input_path,
+                os.path.join(segmentations_output_dir, "converted_dcm.nii.gz"),
+            )
+        elif str(self.input_path).endswith(".nii.gz"):
+            shutil.copy(
+                self.input_path,
+                os.path.join(segmentations_output_dir, "converted_dcm.nii.gz"),
+            )
+
+        inference_pipeline.medical_volume = nib.load(
+            os.path.join(segmentations_output_dir, "converted_dcm.nii.gz")
+        )
+
+        return {}
+
+
 def series_selector(dicom_path, pipeline_name=None):
     ds = pydicom.filereader.dcmread(dicom_path)
     image_type_list = list(ds.ImageType)
