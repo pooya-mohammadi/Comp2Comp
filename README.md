@@ -146,6 +146,7 @@ bin/C2C aaa -i <path/to/input/folder>
 ## Contrast Phase Detection
 
 ### Usage
+Tested with python 3.10
 ```bash
 bin/C2C contrast_phase -i <path/to/input/folder>
 ```
