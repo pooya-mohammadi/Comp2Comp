@@ -2,6 +2,8 @@
 import argparse
 import os
 
+from deep_utils import PyUtils
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
@@ -67,7 +69,7 @@ def MuscleAdiposeTissueFullPipelineBuilder(args):
 def SpinePipelineBuilder(path, args):
     pipeline = InferencePipeline(
         [
-            io.DicomToNifti(path),
+            io.DicomToNifti(path) if args.input_type == "dicom" else io.NiftiReader(path),
             spine.SpineSegmentation(args.spine_model, save=True),
             orientation.ToCanonical(),
             spine.SpineComputeROIs(args.spine_model),
@@ -169,6 +171,7 @@ def argument_parser():
     base_parser = argparse.ArgumentParser(add_help=False)
     base_parser.add_argument("--input_path", "-i", type=str, required=True)
     base_parser.add_argument("--output_path", "-o", type=str)
+    base_parser.add_argument("--input_type", type=str, default="dicom")
     base_parser.add_argument("--save_segmentations", action="store_true")
     base_parser.add_argument("--overwrite_outputs", action="store_true")
 
@@ -261,6 +264,7 @@ def argument_parser():
 
 def main():
     args = argument_parser().parse_args()
+    PyUtils.print_args(args)
     if args.pipeline == "spine_muscle_adipose_tissue":
         process_3d(args, SpineMuscleAdiposeTissuePipelineBuilder)
     elif args.pipeline == "spine":
