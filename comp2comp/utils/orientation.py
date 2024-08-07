@@ -26,6 +26,8 @@ class ToCanonical(InferenceClass):
         canonical_medical_volume = nib.as_closest_canonical(
             inference_pipeline.medical_volume
         )
+
+
         nib.save(
             canonical_segmentation,
             os.path.join(output_dir_segmentations, "canonical_spine_seg.nii.gz"),
@@ -35,8 +37,17 @@ class ToCanonical(InferenceClass):
             canonical_medical_volume,
             os.path.join(output_dir_segmentations, "canonical_converted_dcm.nii.gz"),
         )
-        print(f"[INFO] medical volume: {nib.aff2axcodes(inference_pipeline.medical_volume)} -> canonical: {nib.aff2axcodes(canonical_medical_volume)}")
-        print(f"[INFO] Segmentation: {nib.aff2axcodes(inference_pipeline.segmentation)} -> canonical: {nib.aff2axcodes(canonical_segmentation)}")
+        nib.save(
+            inference_pipeline.segmentation,
+            os.path.join(output_dir_segmentations, "original_spine_seg.nii.gz"),
+        )
+
+        nib.save(
+            inference_pipeline.medical_volume,
+            os.path.join(output_dir_segmentations, "original_converted_dcm.nii.gz"),
+        )
+        # print(f"[INFO] medical volume: {nib.aff2axcodes(inference_pipeline.medical_volume)} -> canonical: {nib.aff2axcodes(canonical_medical_volume)}")
+        # print(f"[INFO] Segmentation: {nib.aff2axcodes(inference_pipeline.segmentation)} -> canonical: {nib.aff2axcodes(canonical_segmentation)}")
         inference_pipeline.segmentation = canonical_segmentation
         inference_pipeline.medical_volume = canonical_medical_volume
         inference_pipeline.pixel_spacing_list = (

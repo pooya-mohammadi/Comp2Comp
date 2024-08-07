@@ -73,8 +73,8 @@ def SpinePipelineBuilder(path, args):
         [
             io.DicomToNifti(path) if args.input_type == "dicom" else io.NiftiReader(path),
             spine.SpineSegmentation(args.spine_model, save=True),
-            orientation.ToCanonical(),  # Make it RAS+
-            spine.SpineComputeROIs(args.spine_model),  # TODO continue from here:)
+            orientation.ToCanonical(),  # Make the segmentation and the input image RAS+
+            spine.SpineComputeROIs(args.spine_model),
             spine.SpineMetricsSaver(),
             spine.SpineCoronalSagittalVisualizer(format="png"),
             spine.SpineReport(format="png"),

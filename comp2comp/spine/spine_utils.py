@@ -14,7 +14,13 @@ import numpy as np
 import scipy
 from scipy.ndimage import zoom
 
+from comp2comp.models.models import Models
 from comp2comp.spine import spine_visualization
+
+import matplotlib
+
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
 
 
 def find_spine_dicoms(centroids: Dict):  # , path: str, levels):
@@ -55,7 +61,7 @@ def save_nifti_select_slices(output_dir: str, vertical_positions):
 # Function that takes a numpy array as input, computes the
 # sagittal centroid of each label and returns a list of the
 # centroids
-def compute_centroids(seg: np.ndarray, spine_model_type):
+def compute_centroids(seg: np.ndarray, spine_model_type: Models) -> dict[str, int]:
     """Compute the centroids of the labels.
 
     Args:
@@ -73,33 +79,31 @@ def compute_centroids(seg: np.ndarray, spine_model_type):
         try:
             pos = compute_centroid(seg, "sagittal", label_idx)
             centroids[level] = pos
-        except Exception:
-            logging.warning(f"Label {level} not found in segmentation volume.")
+        except Exception as e:
+            logging.warning(f"Label {level} not found in segmentation volume. Error: {e}")
     return centroids
 
 
 # Function that takes a numpy array as input, as well as a list of centroids,
 # takes a slice through the centroid on axis = 1 for each centroid
 # and returns a list of the slices
-def get_slices(seg: np.ndarray, centroids: Dict, spine_model_type):
+def get_slices(seg: np.ndarray, centroids: Dict, spine_model_type: Models) -> dict[str, np.ndarray]:
     """Get the slices corresponding to the centroids.
 
     Args:
         seg (np.ndarray): Segmentation volume.
-        centroids (List[int]): List of centroids.
+        centroids (Dict[str, int]): List of centroids.
         spine_model_type (str): Model type.
 
     Returns:
         List[np.ndarray]: List of slices.
     """
     seg = seg.astype(np.uint8)
-    slices = {}
+    slices = dict()
     for level in centroids:
         label_idx = spine_model_type.categories[level]
         binary_seg = (seg[centroids[level], :, :] == label_idx).astype(int)
-        if (
-            np.sum(binary_seg) > 200
-        ):  # heuristic to make sure enough of the body is showing
+        if np.sum(binary_seg) > 200:  # heuristic to make sure enough of the body is showing
             slices[level] = binary_seg
     return slices
 
@@ -136,28 +140,34 @@ def compute_center_of_mass(mask: np.ndarray):
     mask = mask.astype(np.uint8)
     _, _, _, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
     center_of_mass = np.mean(centroids[1:, :], axis=0)
+    # the first one is for the background. The second one is for the foreground!
+    # can use the following as well, the output is the same:
+    # from scipy.ndimage import center_of_mass
+    # center_of_mass(mask)
     return center_of_mass
 
 
 # Function that takes a 3d centroid and retruns a binary mask with a 3d
 # roi around the centroid
-def roi_from_mask(img, centroid: np.ndarray, seg: np.ndarray, slice: np.ndarray):
+def roi_from_mask(img: nib.Nifti1Image, centroid: np.ndarray, seg_numpy: np.ndarray, slice: np.ndarray):
     """Compute a 3D ROI from a 3D mask.
 
     Args:
         img (np.ndarray): Image volume.
         centroid (np.ndarray): Centroid.
+        seg_numpy: whole segmentation with the same
+        slice:
 
     Returns:
         np.ndarray: ROI volume.
     """
-    roi = np.zeros(img.shape)
+    # roi = np.zeros(img.shape)
 
     img_np = img.get_fdata()
 
     pixel_spacing = img.header.get_zooms()
-    length_i = 5.0 / pixel_spacing[0]
-    length_j = 5.0 / pixel_spacing[1]
+    # length_i = 5.0 / pixel_spacing[0]
+    # length_j = 5.0 / pixel_spacing[1]
     length_k = 5.0 / pixel_spacing[2]
 
     print(
@@ -175,158 +185,181 @@ def roi_from_mask(img, centroid: np.ndarray, seg: np.ndarray, slice: np.ndarray)
     ] = 1
     """
     # spherical ROI around centroid
-    spherical = False
+    # spherical = False
     roi = np.zeros(img_np.shape)
 
-    if spherical:
-        i_lower = math.floor(centroid[0] - length_i)
-        j_lower = math.floor(centroid[1] - length_j)
-        k_lower = math.floor(centroid[2] - length_k)
-        i_lower_idx = 1000
-        j_lower_idx = 1000
-        k_lower_idx = 1000
-        i_upper_idx = 0
-        j_upper_idx = 0
-        k_upper_idx = 0
-        found_pixels = False
-        for i in range(i_lower, i_lower + 2 * math.ceil(length_i) + 1):
-            for j in range(j_lower, j_lower + 2 * math.ceil(length_j) + 1):
-                for k in range(k_lower, k_lower + 2 * math.ceil(length_k) + 1):
-                    if (i - centroid[0]) ** 2 / length_i**2 + (
-                        j - centroid[1]
-                    ) ** 2 / length_j**2 + (
-                        k - centroid[2]
-                    ) ** 2 / length_k**2 <= 1:
-                        roi[i, j, k] = 1
-                        if i < i_lower_idx:
-                            i_lower_idx = i
-                        if j < j_lower_idx:
-                            j_lower_idx = j
-                        if k < k_lower_idx:
-                            k_lower_idx = k
-                        if i > i_upper_idx:
-                            i_upper_idx = i
-                        if j > j_upper_idx:
-                            j_upper_idx = j
-                        if k > k_upper_idx:
-                            k_upper_idx = k
-                        found_pixels = True
-        if not found_pixels:
-            print("No pixels in ROI!")
-            raise ValueError
-        print(
-            f"Number of pixels included in i, j, and k directions: {i_upper_idx - i_lower_idx + 1}, "
-            f"{j_upper_idx - j_lower_idx + 1}, {k_upper_idx - k_lower_idx + 1}"
-        )
-        return roi
-    else:
-        roi_start_time = time.time()
+    # if spherical:
+    #     i_lower = math.floor(centroid[0] - length_i)
+    #     j_lower = math.floor(centroid[1] - length_j)
+    #     k_lower = math.floor(centroid[2] - length_k)
+    #     i_lower_idx = 1000
+    #     j_lower_idx = 1000
+    #     k_lower_idx = 1000
+    #     i_upper_idx = 0
+    #     j_upper_idx = 0
+    #     k_upper_idx = 0
+    #     found_pixels = False
+    #     for i in range(i_lower, i_lower + 2 * math.ceil(length_i) + 1):
+    #         for j in range(j_lower, j_lower + 2 * math.ceil(length_j) + 1):
+    #             for k in range(k_lower, k_lower + 2 * math.ceil(length_k) + 1):
+    #                 if (i - centroid[0]) ** 2 / length_i ** 2 + (
+    #                         j - centroid[1]
+    #                 ) ** 2 / length_j ** 2 + (
+    #                         k - centroid[2]
+    #                 ) ** 2 / length_k ** 2 <= 1:
+    #                     roi[i, j, k] = 1
+    #                     if i < i_lower_idx:
+    #                         i_lower_idx = i
+    #                     if j < j_lower_idx:
+    #                         j_lower_idx = j
+    #                     if k < k_lower_idx:
+    #                         k_lower_idx = k
+    #                     if i > i_upper_idx:
+    #                         i_upper_idx = i
+    #                     if j > j_upper_idx:
+    #                         j_upper_idx = j
+    #                     if k > k_upper_idx:
+    #                         k_upper_idx = k
+    #                     found_pixels = True
+    #     if not found_pixels:
+    #         print("No pixels in ROI!")
+    #         raise ValueError
+    #     print(
+    #         f"Number of pixels included in i, j, and k directions: {i_upper_idx - i_lower_idx + 1}, "
+    #         f"{j_upper_idx - j_lower_idx + 1}, {k_upper_idx - k_lower_idx + 1}"
+    #     )
+    #     return roi
+    # else:
+    roi_start_time = time.time()
 
-        mask = None
-        inferior_superior_line = seg[int(centroid[0]), int(centroid[1]), :]
-        # get the center point
-        updated_z_center = np.mean(np.where(inferior_superior_line == 1))
-        lower_z_idx = updated_z_center - ((length_k * 1.5) // 2)
-        upper_z_idx = updated_z_center + ((length_k * 1.5) // 2)
-        for idx in range(int(lower_z_idx), int(upper_z_idx) + 1):
-            # take multiple to increase robustness
-            posterior_anterior_lines = [
-                slice[:, idx],
-                slice[:, idx + 1],
-                slice[:, idx - 1],
-            ]
-            posterior_anterior_sums = [
-                np.sum(posterior_anterior_lines[0]),
-                np.sum(posterior_anterior_lines[1]),
-                np.sum(posterior_anterior_lines[2]),
-            ]
-            min_idx = np.argmin(posterior_anterior_sums)
+    updated_mask = mask = None
+    inferior_superior_line = seg_numpy[int(centroid[0]), int(centroid[1]), :]
+    # get the center point
+    updated_z_center = np.mean(np.where(inferior_superior_line == 1))
+    print(f"[INFO] updated_z_center: {updated_z_center}, previous one: {centroid[2]}")
+    # what is 1.5?
+    lower_z_idx = updated_z_center - ((length_k * 1.5) // 2)
+    upper_z_idx = updated_z_center + ((length_k * 1.5) // 2)
+    print(f"[INFO] number of z indices to check: {upper_z_idx - lower_z_idx + 1}")
+    for z_idx in range(int(lower_z_idx), int(upper_z_idx) + 1):
+        # take multiple to increase robustness
+        posterior_anterior_lines = [
+            slice[:, z_idx - 1],
+            slice[:, z_idx],
+            slice[:, z_idx + 1],
+        ]
+        lines_ = np.sum([cv2.line(np.zeros_like(slice), (item, 0), (item, slice.shape[0]), color=1) for item in
+                         [z_idx - 1, z_idx, z_idx + 1]], axis=0)
+        plt.imshow(np.flip(np.flip((slice + lines_).T, axis=0), axis=1), cmap="gray_r")
+        plt.show()
 
-            posterior_anterior_line = posterior_anterior_lines[min_idx]
-            updated_posterior_anterior_center = (
+        posterior_anterior_sums = [np.sum(line) for line in posterior_anterior_lines]
+        # np.sum(posterior_anterior_lines[0]),
+        # np.sum(posterior_anterior_lines[1]),
+        # np.sum(posterior_anterior_lines[2]),
+        # ]
+        min_z_idx = np.argmin(posterior_anterior_sums)
+        # why choosing the z index(line) which has the lowest spine?!
+        # I believe based on the image of the slice, if the line is closer to the middle, it would have lesser number of
+        # voxels of the vertebral class
+
+        posterior_anterior_line = posterior_anterior_lines[min_z_idx]
+        # where does 0.58 come from? to get the center 58 percent is used! But why?!
+        updated_posterior_anterior_center = (
                 np.min(np.where(posterior_anterior_line == 1))
                 + np.sum(posterior_anterior_line) * 0.58
-            )
-            posterior_anterior_length = (posterior_anterior_sums[min_idx] * 0.5) // 2
+        )
+        posterior_anterior_length = (posterior_anterior_sums[min_z_idx] * 0.5) // 2
+        # why dividing by 4 results in posterior length?
 
-            left_right_lines = [
-                seg[:, int(updated_posterior_anterior_center), idx],
-                seg[:, int(updated_posterior_anterior_center) + 1, idx],
-                seg[:, int(updated_posterior_anterior_center) - 1, idx],
-            ]
+        # Get left-right length
+        left_right_lines = [
+            seg_numpy[:, int(updated_posterior_anterior_center) - 1, z_idx],
+            seg_numpy[:, int(updated_posterior_anterior_center), z_idx],
+            seg_numpy[:, int(updated_posterior_anterior_center) + 1, z_idx],
+        ]
+        lines_ = np.sum(
+            [cv2.line(np.zeros_like(seg_numpy[..., z_idx]).astype(np.uint8),
+                      (item, 0), (item, slice.shape[1]), color=1) for item in
+             [int(updated_posterior_anterior_center) - 1,
+              int(updated_posterior_anterior_center),
+              int(updated_posterior_anterior_center) + 1]], axis=0)
+        plt.imshow(np.flip(np.flip((seg_numpy[:, :, z_idx].astype(np.uint8) + lines_).T, axis=0), axis=1),
+                   cmap="gray_r")
+        plt.show()
 
-            left_right_sums = [
-                np.sum(left_right_lines[0]),
-                np.sum(left_right_lines[1]),
-                np.sum(left_right_lines[2]),
-            ]
+        left_right_sums = [np.sum(line) for line in left_right_lines]
+        # np.sum(left_right_lines[0]),
+        # np.sum(left_right_lines[1]),
+        # np.sum(left_right_lines[2]),
+        # ]
 
-            min_idx = np.argmin(left_right_sums)
-            left_right_line = left_right_lines[min_idx]
+        min_idx = np.argmin(left_right_sums)
+        left_right_line = left_right_lines[min_idx]
+        # why min here? I have no idea :)
 
-            updated_left_right_center = np.mean(np.where(left_right_line == 1))
-            left_right_length = (left_right_sums[min_idx] * 0.65) // 2
+        updated_left_right_center = np.mean(np.where(left_right_line == 1))
+        left_right_length = (left_right_sums[min_idx] * 0.65) // 2
+        # where does 0.65 come from? Is it because of the curve of the image?
 
-            roi_2d = np.zeros((img_np.shape[0], img_np.shape[1]))
-            h = updated_left_right_center
-            k = updated_posterior_anterior_center
+        roi_2d = np.zeros((img_np.shape[0], img_np.shape[1]))
 
-            # Semi-axes lengths (a, b)
-            a = left_right_length
-            b = posterior_anterior_length
+        h = updated_left_right_center
+        k = updated_posterior_anterior_center
 
-            # Calculate the min and max indices for x and y
-            x_min = int(max(h - a, 0))
-            x_max = int(min(h + a, img_np.shape[0]))
-            y_min = int(max(k - b, 0))
-            y_max = int(min(k + b, img_np.shape[1]))
+        # Semi-axes lengths (a, b)
+        a = left_right_length
+        b = posterior_anterior_length
 
-            # Create an oval ROI within the bounds
-            for x in range(x_min - 2, x_max + 2):
-                for y in range(y_min - 2, y_max + 2):
-                    if ((x - h) / a) ** 2 + ((y - k) / b) ** 2 <= 1:
-                        roi_2d[x, y] = 1
-            roi[:, :, idx] = roi_2d
-            if idx == int(centroid[2]):
-                mask = np.flip(np.flip(np.transpose(roi_2d), axis=0), axis=1)
-            if idx == updated_z_center:
-                updated_mask = np.flip(np.flip(np.transpose(roi_2d), axis=0), axis=1)
-        if mask is None:
-            mask = updated_mask
+        # Calculate the min and max indices for x and y
+        x_min = int(max(h - a, 0))
+        x_max = int(min(h + a, img_np.shape[0]))
+        y_min = int(max(k - b, 0))
+        y_max = int(min(k + b, img_np.shape[1]))
 
-        start_time = time.time()
+        # Create an oval ROI within the bounds
+        for x in range(x_min - 2, x_max + 2):
+            for y in range(y_min - 2, y_max + 2):
+                if ((x - h) / a) ** 2 + ((y - k) / b) ** 2 <= 1:
+                    roi_2d[x, y] = 1
 
-        # Make sure there is no overlap with the cortical bone
-        num_iteration = 2
-        if pixel_spacing[2] >= 3:
-            num_iteration = 1
-        struct = scipy.ndimage.generate_binary_structure(3, 1)
-        struct = scipy.ndimage.iterate_structure(struct, num_iteration)
-        seg = scipy.ndimage.binary_erosion(seg, structure=struct).astype(np.int8)
+        roi[:, :, z_idx] = roi_2d
+        if z_idx == int(centroid[2]):
+            mask = np.flip(np.flip(np.transpose(roi_2d), axis=0), axis=1)
+        if z_idx == int(updated_z_center):
+            updated_mask = np.flip(np.flip(np.transpose(roi_2d), axis=0), axis=1)
+    if mask is None:
+        mask = updated_mask
 
-        roi = roi * seg
+    start_time = time.time()
 
-        end_time = time.time()
-        roi_end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Elapsed time for erosion operation: {elapsed_time} seconds")
+    # Make sure there is no overlap with the cortical bone
+    num_iteration = 2
+    if pixel_spacing[2] >= 3:
+        num_iteration = 1
+    struct = scipy.ndimage.generate_binary_structure(3, 1)
+    struct = scipy.ndimage.iterate_structure(struct, num_iteration)
+    seg = scipy.ndimage.binary_erosion(seg_numpy, structure=struct).astype(np.int8)
 
-        elapsed_time = roi_end_time - roi_start_time
-        print(f"Elapsed time for full ROI computation: {elapsed_time} seconds")
+    roi = roi * seg
 
-        return roi, mask
+    elapsed_time = time.time() - start_time
+    print(f"Elapsed time for erosion operation: {elapsed_time} seconds")
+
+    elapsed_time = time.time() - roi_start_time
+    print(f"Elapsed time for full ROI computation: {elapsed_time} seconds")
+
+    return roi, mask
 
 
 # Function that takes a 3d image and a 3d binary mask and returns that average
 # value of the image inside the mask
-def mean_img_mask(img: np.ndarray, mask: np.ndarray, index: int):
+def mean_img_mask(img: np.ndarray, mask: np.ndarray):
     """Compute the mean of an image inside a mask.
 
     Args:
         img (np.ndarray): Image volume.
         mask (np.ndarray): Mask volume.
-        rescale_slope (float): Rescale slope.
-        rescale_intercept (float): Rescale intercept.
 
     Returns:
         float: Mean value.
@@ -340,14 +373,12 @@ def mean_img_mask(img: np.ndarray, mask: np.ndarray, index: int):
     return mean
 
 
-def compute_rois(seg, img, spine_model_type):
+def compute_rois(seg: nib.Nifti1Image, img: nib.Nifti1Image, spine_model_type):
     """Compute the ROIs for the spine.
 
     Args:
-        seg (np.ndarray): Segmentation volume.
-        img (np.ndarray): Image volume.
-        rescale_slope (float): Rescale slope.
-        rescale_intercept (float): Rescale intercept.
+        seg (nib.Nifti1Image): Segmentation volume.
+        img (nib.Nifti1Image): Image volume.
         spine_model_type (Models): Model type.
 
     Returns:
@@ -355,13 +386,13 @@ def compute_rois(seg, img, spine_model_type):
         rois (List[np.ndarray]): List of ROIs.
         centroids_3d (List[np.ndarray]): List of centroids.
     """
-    seg_np = seg.get_fdata()
-    centroids = compute_centroids(seg_np, spine_model_type)
-    slices = get_slices(seg_np, centroids, spine_model_type)
-    for level in slices:
-        slice = slices[level]
+    seg_numpy = seg.get_fdata()
+    image_numpy = img.get_fdata()
+    centroids = compute_centroids(seg_numpy, spine_model_type)
+    slices = get_slices(seg_numpy, centroids, spine_model_type)
+    for level, slice_ in slices.items():
         # keep only the two largest connected components
-        two_largest, two = keep_two_largest_connected_components(slice)
+        two_largest, two = keep_two_largest_connected_components(slice_)
         if two:
             slices[level] = delete_right_most_connected_component(two_largest)
 
@@ -371,27 +402,28 @@ def compute_rois(seg, img, spine_model_type):
     centroids_3d = {}
     segmentation_hus = {}
     spine_masks = {}
-    for i, level in enumerate(slices):
-        slice = slices[level]
+    for i, (level, slice) in enumerate(slices.items()):
+        # slice = slices[level]
         center_of_mass = compute_center_of_mass(slice)
-        centroid = np.array([centroids[level], center_of_mass[1], center_of_mass[0]])
+        centroid = np.array([centroids[level], center_of_mass[1], center_of_mass[0]])  # because it's sagital
         roi, mask_2d = roi_from_mask(
             img,
             centroid,
-            (seg_np == spine_model_type.categories[level]).astype(int),
+            (seg_numpy == spine_model_type.categories[level]).astype(int),
             slice,
         )
-        image_numpy = img.get_fdata()
-        spine_hus[level] = mean_img_mask(image_numpy, roi, i)
         rois[level] = roi
-        mask = (seg_np == spine_model_type.categories[level]).astype(int)
-        segmentation_hus[level] = mean_img_mask(image_numpy, mask, i)
+
+        spine_hus[level] = mean_img_mask(image_numpy, roi)
+
+        mask = (seg_numpy == spine_model_type.categories[level]).astype(int)
+        segmentation_hus[level] = mean_img_mask(image_numpy, mask)
         centroids_3d[level] = centroid
         spine_masks[level] = mask_2d
-    return (spine_hus, rois, segmentation_hus, centroids_3d, spine_masks)
+    return spine_hus, rois, segmentation_hus, centroids_3d, spine_masks
 
 
-def keep_two_largest_connected_components(mask: Dict):
+def keep_two_largest_connected_components(mask: np.ndarray):
     """Keep the two largest connected components.
 
     Args:
@@ -402,9 +434,9 @@ def keep_two_largest_connected_components(mask: Dict):
     """
     mask = mask.astype(np.uint8)
     # sort connected components by size
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-        mask, connectivity=8
-    )
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    # Statistics on each connected component, including the bounding box coordinates and area (in pixels).
+    # corresponding to area!
     stats = stats[1:, 4]
     sorted_indices = np.argsort(stats)[::-1]
     # keep only the two largest connected components
@@ -412,10 +444,10 @@ def keep_two_largest_connected_components(mask: Dict):
     mask[labels == sorted_indices[0] + 1] = 1
     two = True
     try:
-        mask[labels == sorted_indices[1] + 1] = 1
-    except Exception:
+        mask[labels == sorted_indices[1] + 1] = 1  # If there were less than two objects this will return an Error!
+    except Exception as e:
         two = False
-    return (mask, two)
+    return mask, two
 
 
 def compute_centroid(seg: np.ndarray, plane: str, label: int):
@@ -438,9 +470,12 @@ def compute_centroid(seg: np.ndarray, plane: str, label: int):
     elif plane == "coronal":
         sum_out_axes = (0, 2)
         sum_axis = 1
+    else:
+        raise ValueError(f"Input plane: {plane} is not supported!")
     sums = np.sum(seg == label, axis=sum_out_axes)
     normalized_sums = sums / np.sum(sums)
     pos = int(np.sum(np.arange(0, seg.shape[sum_axis]) * normalized_sums))
+    # This is the weighted mean of sagital view in 1D. This results in an index which is corresponding to the centroid
     return pos
 
 
@@ -464,16 +499,16 @@ def to_one_hot(label: np.ndarray, model_type, spine_hus):
 
 
 def visualize_coronal_sagittal_spine(
-    seg: np.ndarray,
-    rois: List[np.ndarray],
-    mvs: np.ndarray,
-    centroids_3d: np.ndarray,
-    output_dir: str,
-    spine_hus=None,
-    seg_hus=None,
-    model_type=None,
-    pixel_spacing=None,
-    format="png",
+        seg: np.ndarray,
+        rois: List[np.ndarray],
+        mvs: np.ndarray,
+        centroids_3d: np.ndarray,
+        output_dir: str,
+        spine_hus=None,
+        seg_hus=None,
+        model_type=None,
+        pixel_spacing=None,
+        format="png",
 ):
     """Visualize the coronal and sagittal planes of the spine.
 
@@ -522,14 +557,10 @@ def visualize_coronal_sagittal_spine(
     for roi in rois:
         one_hot_roi_label = roi[:, coronal_vals, range(len(coronal_vals))]
         one_hot_roi_label = zoom(one_hot_roi_label, (1, zoom_factor), order=1).round()
-        one_hot_cor_label = np.concatenate(
-            (
-                one_hot_cor_label,
-                one_hot_roi_label.reshape(
-                    (one_hot_roi_label.shape[0], one_hot_roi_label.shape[1], 1)
-                ),
-            ),
-            axis=2,
+        one_hot_cor_label = np.concatenate((
+            one_hot_cor_label,
+            one_hot_roi_label.reshape((one_hot_roi_label.shape[0], one_hot_roi_label.shape[1], 1)),
+        ), axis=2,
         )
 
     # flip both axes of coronal image
@@ -611,7 +642,7 @@ def curved_planar_reformation(mvs, centroids):
     sagittal_vals = sagittal_vals.astype(int)
     coronal_vals = coronal_vals.astype(int)
 
-    return (sagittal_vals, coronal_vals)
+    return sagittal_vals, coronal_vals
 
 
 '''
