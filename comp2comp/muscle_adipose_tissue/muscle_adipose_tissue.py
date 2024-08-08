@@ -3,7 +3,8 @@ import zipfile
 from pathlib import Path
 from time import perf_counter
 from typing import List, Union
-
+import matplotlib.pyplot as plt
+from deep_utils import NIBUtils
 import cv2
 import h5py
 import nibabel as nib
@@ -12,7 +13,7 @@ import pandas as pd
 import wget
 from keras import backend as K
 from tqdm import tqdm
-
+from os.path import join
 from comp2comp.inference_class_base import InferenceClass
 from comp2comp.metrics.metrics import CrossSectionalArea, HounsfieldUnits
 from comp2comp.models.models import Models
@@ -22,8 +23,7 @@ from comp2comp.muscle_adipose_tissue.data import Dataset, predict
 class MuscleAdiposeTissueSegmentation(InferenceClass):
     """Muscle adipose tissue segmentation class."""
 
-    def __init__(self, batch_size: int, model_name: str, model_dir: str = None):
-        super().__init__()
+    def __init__(self, batch_size: int, model_name: str):
         self.batch_size = batch_size
         self.model_name = model_name
         self.model_type = Models.model_from_name(model_name)
@@ -49,7 +49,8 @@ class MuscleAdiposeTissueSegmentation(InferenceClass):
             results[i]["preds"] = preds[i]
         return results
 
-    def download_muscle_adipose_tissue_model(self, model_dir: Union[str, Path]):
+    @staticmethod
+    def download_muscle_adipose_tissue_model(model_dir: Union[str, Path]):
         download_dir = Path(
             os.path.join(
                 model_dir,
@@ -120,7 +121,7 @@ class MuscleAdiposeTissueSegmentation(InferenceClass):
             pred = nib.load(output_path)
             pred = nib.as_closest_canonical(pred)
             pred = pred.get_fdata()
-
+            # get split into various z indices!
             images = [image[:, :, i] for i in range(image.shape[-1])]
             preds = [pred[:, :, i] for i in range(pred.shape[-1])]
 
@@ -129,7 +130,7 @@ class MuscleAdiposeTissueSegmentation(InferenceClass):
             preds = [np.flip(np.flip(pred, axis=0), axis=1).T for pred in preds]
 
             spacings = [
-                image_nib.header.get_zooms()[0:2] for i in range(image.shape[-1])
+                image_nib.header.get_zooms()[0:2] for _ in range(image.shape[-1])
             ]
 
             categories = self.model_type.categories
@@ -170,9 +171,6 @@ class MuscleAdiposeTissueSegmentation(InferenceClass):
 class MuscleAdiposeTissuePostProcessing(InferenceClass):
     """Post-process muscle and adipose tissue segmentation."""
 
-    def __init__(self):
-        super().__init__()
-
     def preds_to_mask(self, preds):
         """Convert model predictions to a mask.
 
@@ -195,12 +193,14 @@ class MuscleAdiposeTissuePostProcessing(InferenceClass):
 
     def __call__(self, inference_pipeline, images, preds, spacings):
         """Post-process muscle and adipose tissue segmentation."""
+        self.inference_pipeline = inference_pipeline
         self.model_type = inference_pipeline.muscle_adipose_tissue_model_type
         self.use_softmax = self.model_type.use_softmax
         self.model_name = inference_pipeline.muscle_adipose_tissue_model_name
         return self.post_process(images, preds, spacings)
 
-    def remove_small_objects(self, mask, min_size=10):
+    @staticmethod
+    def remove_small_objects(mask, min_size=10):
         mask = mask.astype(np.uint8)
         components, output, stats, centroids = cv2.connectedComponentsWithStats(
             mask, connectivity=8
@@ -213,10 +213,10 @@ class MuscleAdiposeTissuePostProcessing(InferenceClass):
         return mask
 
     def post_process(
-        self,
-        images,
-        preds,
-        spacings,
+            self,
+            images,
+            preds,
+            spacings,
     ):
         categories = self.model_type.categories
 
@@ -238,27 +238,29 @@ class MuscleAdiposeTissuePostProcessing(InferenceClass):
         file_idx = 0
         for mask, image in tqdm(zip(masks, images), total=len(masks)):
             muscle_mask = mask[..., cats.index("muscle")]
-            imat_mask = mask[..., cats.index("imat")]
+            # imat_mask = mask[..., cats.index("imat")]
             imat_mask = (
                 np.logical_and(
                     (image * muscle_mask) <= -30, (image * muscle_mask) >= -190
                 )
             ).astype(int)
+            # seems classification is not working well!
             imat_mask = self.remove_small_objects(imat_mask)
             mask[..., cats.index("imat")] += imat_mask
             mask[..., cats.index("muscle")][imat_mask == 1] = 0
             masks[file_idx] = mask
             images[file_idx] = image
             file_idx += 1
-
-        print(
-            f"Completed post-processing in {(perf_counter() - start_time):.2f} seconds."
-        )
+        # post_save_masks = np.array([np.sum(mask * list(range(1, len(cats) + 1)), axis=-1) for mask in masks]).transpose(
+        #     (2, 1, 0))
+        # NIBUtils.save_sample(join(self.inference_pipeline.output_dir, "segmentations", "post_save_masks2.nii.gz"),
+        #                      np.flip(post_save_masks, axis=1), nib_img=self.inference_pipeline.medical_volume)
+        print(f"Completed post-processing in {(perf_counter() - start_time):.2f} seconds.")
 
         return {"images": images, "masks": masks, "spacings": spacings}
 
-    # function that fills in holes in a segmentation mask
-    def _fill_holes(self, mask: np.ndarray, mask_id: int):
+    @staticmethod
+    def _fill_holes(mask: np.ndarray, mask_id: int):
         """Fill in holes in a segmentation mask.
 
         Args:
@@ -323,6 +325,7 @@ class MuscleAdiposeTissueComputeMetrics(InferenceClass):
         Args:
             images (List[np.ndarray]): Images.
             masks (List[np.ndarray]): Masks.
+            spacings
 
         Returns:
             Dict: Results.
@@ -332,7 +335,7 @@ class MuscleAdiposeTissueComputeMetrics(InferenceClass):
             results.append(self.compute_metrics(image, mask, spacing))
         return {"images": images, "results": results}
 
-    def compute_metrics(self, x, mask, spacing):
+    def compute_metrics(self, img, mask, spacing):
         """Compute results for a given segmentation."""
         categories = self.model_type.categories
 
@@ -340,7 +343,7 @@ class MuscleAdiposeTissueComputeMetrics(InferenceClass):
         csa_units = "cm^2" if spacing else ""
         csa = CrossSectionalArea(csa_units)
 
-        hu_vals = hu(mask, x, category_dim=-1)
+        hu_vals = hu(mask, img, category_dim=-1)
         csa_vals = csa(mask=mask, spacing=spacing, category_dim=-1)
 
         # check if any values are nan and replace with 0
@@ -390,7 +393,7 @@ class MuscleAdiposeTissueH5Saver(InferenceClass):
         for i, result in enumerate(results):
             file_name = self.dicom_file_names[i]
             with h5py.File(
-                os.path.join(self.h5_output_dir, file_name + ".h5"), "w"
+                    os.path.join(self.h5_output_dir, file_name + ".h5"), "w"
             ) as f:
                 for cat in cats:
                     mask = result[cat]["mask"]

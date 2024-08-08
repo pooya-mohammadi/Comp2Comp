@@ -12,6 +12,7 @@ import dosma as dm
 import nibabel as nib
 import pydicom
 import SimpleITK as sitk
+from deep_utils import NIBUtils
 
 from comp2comp.inference_class_base import InferenceClass
 
@@ -40,7 +41,7 @@ class NiftiSaver(InferenceClass):
         self.nw = dm.NiftiWriter()
 
     def __call__(
-        self, inference_pipeline, medical_volume: dm.MedicalVolume
+            self, inference_pipeline, medical_volume: dm.MedicalVolume
     ) -> Dict[str, Path]:
         nifti_file = inference_pipeline.output_dir
         self.nw.write(medical_volume, nifti_file)
@@ -83,9 +84,9 @@ class DicomToNifti(InferenceClass):
         dcm_files = [d for d in os.listdir(self.input_path) if d.endswith('.dcm')]
         inference_pipeline.dcm = pydicom.read_file(os.path.join(self.input_path, dcm_files[0]))
         if os.path.exists(
-            os.path.join(
-                inference_pipeline.output_dir, "segmentations", "converted_dcm.nii.gz"
-            )
+                os.path.join(
+                    inference_pipeline.output_dir, "segmentations", "converted_dcm.nii.gz"
+                )
         ):
             return {}
         if hasattr(inference_pipeline, "medical_volume"):
@@ -127,17 +128,18 @@ class DicomToNifti(InferenceClass):
 class NiftiReader(InferenceClass):
     """Reads NiftiFile"""
 
-    def __init__(self, input_path: Union[str, Path], pipeline_name=None, save=True):
+    def __init__(self, input_path: Union[str, Path], pipeline_name=None, save=True, z0=None, z1=None):
         super().__init__()
         self.input_path = Path(input_path)
         self.save = save
         self.pipeline_name = pipeline_name
+        self.z0, self.z1 = z0, z1
 
     def __call__(self, inference_pipeline):
         if os.path.exists(
-            os.path.join(
-                inference_pipeline.output_dir, "segmentations", "converted_dcm.nii.gz"
-            )
+                os.path.join(
+                    inference_pipeline.output_dir, "segmentations", "converted_dcm.nii.gz"
+                )
         ):
             return {}
         if hasattr(inference_pipeline, "medical_volume"):
@@ -168,6 +170,18 @@ class NiftiReader(InferenceClass):
                 self.input_path,
                 os.path.join(segmentations_output_dir, "converted_dcm.nii.gz"),
             )
+            if self.z0 or self.z1:
+                arr, img = NIBUtils.get_array_img(self.input_path)
+
+                arr = arr[..., self.z0 or 0:self.z1 or arr.shape[-1]]
+                NIBUtils.save_sample(os.path.join(segmentations_output_dir, "converted_dcm_multilevel.nii.gz"),
+                                     arr,
+                                     nib_img=img)
+            else:
+                shutil.copy(
+                    self.input_path,
+                    os.path.join(segmentations_output_dir, "converted_dcm_multilevel.nii.gz"),
+                )
 
         inference_pipeline.medical_volume = nib.load(
             os.path.join(segmentations_output_dir, "converted_dcm.nii.gz")

@@ -8,9 +8,6 @@ from typing import Dict
 class InferenceClass:
     """Base class for inference classes."""
 
-    def __init__(self):
-        pass
-
     def __call__(self, inference_pipeline) -> Dict:
         raise NotImplementedError
 

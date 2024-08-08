@@ -495,3 +495,4 @@ class SpineMuscleAdiposeTissueReport(InferenceClass):
         im_cor.close()
         im_sag.close()
         new_im.close()
+

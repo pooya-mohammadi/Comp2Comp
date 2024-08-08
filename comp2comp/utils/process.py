@@ -142,8 +142,8 @@ def process_3d(args, pipeline_builder):
         except Exception:
             print(f"ERROR PROCESSING {path}\n")
             traceback.print_exc()
-            if os.path.exists(output_dir):
-                shutil.rmtree(output_dir)
+            # if os.path.exists(output_dir):
+            #     shutil.rmtree(output_dir)
             # remove parent folder if empty
             if len(os.listdir(os.path.dirname(output_dir))) == 0:
                 shutil.rmtree(os.path.dirname(output_dir))

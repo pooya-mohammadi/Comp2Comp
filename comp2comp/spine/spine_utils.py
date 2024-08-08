@@ -599,8 +599,8 @@ def visualize_coronal_sagittal_spine(
         sagittal_name,
         spine_hus=spine_hus,
         seg_hus=seg_hus,
-        model_type=model_type,
-        pixel_spacing=pixel_spacing,
+        # model_type=model_type,
+        # pixel_spacing=pixel_spacing,
     )
     img_coronal = spine_visualization.spine_binary_segmentation_overlay(
         coronal_image,
@@ -609,8 +609,8 @@ def visualize_coronal_sagittal_spine(
         coronal_name,
         spine_hus=spine_hus,
         seg_hus=seg_hus,
-        model_type=model_type,
-        pixel_spacing=pixel_spacing,
+        # model_type=model_type,
+        # pixel_spacing=pixel_spacing,
     )
 
     return img_sagittal, img_coronal
