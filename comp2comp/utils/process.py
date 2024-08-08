@@ -48,8 +48,7 @@ def process_2d(args, pipeline_builder):
 
 def process_3d(args, pipeline_builder):
     model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../models")
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
+    os.makedirs(model_dir, exist_ok=True)
 
     if args.output_path is not None:
         output_path = Path(args.output_path)
