@@ -406,7 +406,7 @@ class SpineCoronalSagittalVisualizer(InferenceClass):
             seg_hus=inference_pipeline.segmentation_hus,
             model_type=spine_model_type,
             pixel_spacing=inference_pipeline.pixel_spacing_list,
-            format=self.format,
+            output_format=self.format,
         )
         inference_pipeline.spine_vis_sagittal = img_sagittal
         inference_pipeline.spine_vis_coronal = img_coronal
@@ -417,9 +417,9 @@ class SpineCoronalSagittalVisualizer(InferenceClass):
 
 
 class SpineReport(InferenceClass):
-    def __init__(self, format="png"):
+    def __init__(self, output_format="png"):
         super().__init__()
-        self.format = format
+        self.format = output_format
 
     def __call__(self, inference_pipeline):
         sagittal_image = inference_pipeline.spine_vis_sagittal

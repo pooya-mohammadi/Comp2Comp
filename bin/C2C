@@ -76,8 +76,8 @@ def SpinePipelineBuilder(path, args):
             orientation.ToCanonical(),  # Make the segmentation and the input image RAS+
             spine.SpineComputeROIs(args.spine_model),
             spine.SpineMetricsSaver(),
-            spine.SpineCoronalSagittalVisualizer(format="png"),  # TODO continue from here
-            spine.SpineReport(format="png"),
+            spine.SpineCoronalSagittalVisualizer(format="png"),
+            spine.SpineReport(output_format="png"),
         ]
     )
     return pipeline

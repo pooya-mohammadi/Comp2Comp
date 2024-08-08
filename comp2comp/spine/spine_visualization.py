@@ -16,12 +16,8 @@ def spine_binary_segmentation_overlay(
     mask: Union[str, Path],
     base_path: Union[str, Path],
     file_name: str,
-    figure_text_key=None,
     spine_hus=None,
     seg_hus=None,
-    spine=True,
-    model_type=None,
-    pixel_spacing=None,
 ):
     """Save binary segmentation overlay.
     Args:
@@ -29,11 +25,11 @@ def spine_binary_segmentation_overlay(
         mask (Union[str, Path]): Path to the mask.
         base_path (Union[str, Path]): Path to the output directory.
         file_name (str): Output file name.
-        centroids (list, optional): List of centroids. Defaults to None.
         figure_text_key (dict, optional): Figure text key. Defaults to None.
         spine_hus (list, optional): List of HU values. Defaults to None.
         spine (bool, optional): Spine flag. Defaults to True.
         model_type (Models): Model type. Defaults to None.
+        seg_hus
     """
     _COLORS = (
         np.array(

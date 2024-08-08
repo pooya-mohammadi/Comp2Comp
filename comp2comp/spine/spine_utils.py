@@ -16,7 +16,7 @@ from scipy.ndimage import zoom
 
 from comp2comp.models.models import Models
 from comp2comp.spine import spine_visualization
-
+from deep_utils import NIBUtils
 import matplotlib
 
 matplotlib.use('Qt5Agg')
@@ -508,7 +508,7 @@ def visualize_coronal_sagittal_spine(
         seg_hus=None,
         model_type=None,
         pixel_spacing=None,
-        format="png",
+        output_format="png",
 ):
     """Visualize the coronal and sagittal planes of the spine.
 
@@ -516,34 +516,35 @@ def visualize_coronal_sagittal_spine(
         seg (np.ndarray): Segmentation volume.
         rois (List[np.ndarray]): List of ROIs.
         mvs (dm.MedicalVolume): Medical volume.
-        centroids (List[int]): List of centroids.
-        label_text (List[str]): List of labels.
+        centroids_3d (List[int]): List of centroids.
+        seg_hus:
+        pixel_spacing:
         output_dir (str): Output directory.
         spine_hus (List[float], optional): List of HU values. Defaults to None.
         model_type (Models, optional): Model type. Defaults to None.
+        output_format: png
     """
 
     sagittal_vals, coronal_vals = curved_planar_reformation(mvs, centroids_3d)
     zoom_factor = pixel_spacing[2] / pixel_spacing[1]
+    if pixel_spacing[0] != pixel_spacing[1]:
+        print(f"[WARNING] Spacing of x and y are not the same: {pixel_spacing}")
 
     sagittal_image = mvs[sagittal_vals, :, range(len(sagittal_vals))]
     sagittal_label = seg[sagittal_vals, :, range(len(sagittal_vals))]
     sagittal_image = zoom(sagittal_image, (zoom_factor, 1), order=3)
+    # no zoom in z axis. only on sagittal
     sagittal_label = zoom(sagittal_label, (zoom_factor, 1), order=1).round()
 
     one_hot_sag_label = to_one_hot(sagittal_label, model_type, spine_hus)
     for roi in rois:
         one_hot_roi_label = roi[sagittal_vals, :, range(len(sagittal_vals))]
         one_hot_roi_label = zoom(one_hot_roi_label, (zoom_factor, 1), order=1).round()
-        one_hot_sag_label = np.concatenate(
-            (
-                one_hot_sag_label,
-                one_hot_roi_label.reshape(
-                    (one_hot_roi_label.shape[0], one_hot_roi_label.shape[1], 1)
-                ),
-            ),
-            axis=2,
-        )
+        one_hot_sag_label = np.concatenate((
+            one_hot_sag_label,
+            one_hot_roi_label.reshape(
+                (one_hot_roi_label.shape[0], one_hot_roi_label.shape[1], 1)
+            ),), axis=2, )
 
     coronal_image = mvs[:, coronal_vals, range(len(coronal_vals))]
     coronal_label = seg[:, coronal_vals, range(len(coronal_vals))]
@@ -563,29 +564,29 @@ def visualize_coronal_sagittal_spine(
         ), axis=2,
         )
 
-    # flip both axes of coronal image
+    # flip both axes of sagittal image
     sagittal_image = np.flip(sagittal_image, axis=0)
     sagittal_image = np.flip(sagittal_image, axis=1)
 
-    # flip both axes of coronal label
+    # flip both axes of sagittal label
     one_hot_sag_label = np.flip(one_hot_sag_label, axis=0)
     one_hot_sag_label = np.flip(one_hot_sag_label, axis=1)
 
     coronal_image = np.transpose(coronal_image)
     one_hot_cor_label = np.transpose(one_hot_cor_label, (1, 0, 2))
 
-    # flip both axes of sagittal image
+    # flip both axes of coronal image
     coronal_image = np.flip(coronal_image, axis=0)
     coronal_image = np.flip(coronal_image, axis=1)
 
-    # flip both axes of sagittal label
+    # flip both axes of coronal label
     one_hot_cor_label = np.flip(one_hot_cor_label, axis=0)
     one_hot_cor_label = np.flip(one_hot_cor_label, axis=1)
 
-    if format == "png":
+    if output_format == "png":
         sagittal_name = "spine_sagittal.png"
         coronal_name = "spine_coronal.png"
-    elif format == "dcm":
+    elif output_format == "dcm":
         sagittal_name = "spine_sagittal.dcm"
         coronal_name = "spine_coronal.dcm"
     else:
@@ -616,32 +617,41 @@ def visualize_coronal_sagittal_spine(
 
 
 def curved_planar_reformation(mvs, centroids):
-    centroids = sorted(centroids, key=lambda x: x[2])
+    """
+    This function interpolates centroids in z axis.
+    With this function we have one centroid for z index.
+    from 0 - z-centroids[0] is equal to (sagittal/coronal)-centroids[0]
+    from z-centroids[-1] - len(mvs) is equal to (sagittal/coronal)-centroids[-1]
+    """
+    centroids = sorted(centroids, key=lambda x: x[2])  # sort based on z index!
     centroids = [(int(x[0]), int(x[1]), int(x[2])) for x in centroids]
     sagittal_centroids = [centroids[i][0] for i in range(0, len(centroids))]
     coronal_centroids = [centroids[i][1] for i in range(0, len(centroids))]
     axial_centroids = [centroids[i][2] for i in range(0, len(centroids))]
     sagittal_vals = [sagittal_centroids[0]] * axial_centroids[0]
-    coronal_vals = [coronal_centroids[0]] * axial_centroids[0]
+    # from index zero till the first centroid we keep the first centroid of sagittal centroid
+    coronal_vals = [coronal_centroids[0]] * axial_centroids[0]  # same goes for coronal
 
     for i in range(1, len(axial_centroids)):
         num = axial_centroids[i] - axial_centroids[i - 1]
-        interp = list(
-            np.linspace(sagittal_centroids[i - 1], sagittal_centroids[i], num=num)
-        )
+        # z-distance between two subsequent centroids of vertebral bones
+        interp = list(np.linspace(sagittal_centroids[i - 1], sagittal_centroids[i], num=num))
+        # split two sagittal centroids into z-distance. Why?
+        # Because they want to have the same number of values for sagittal and coronal equal to z dimension
         sagittal_vals.extend(interp)
-        interp = list(
-            np.linspace(coronal_centroids[i - 1], coronal_centroids[i], num=num)
-        )
+        interp = list(np.linspace(coronal_centroids[i - 1], coronal_centroids[i], num=num))
         coronal_vals.extend(interp)
 
     sagittal_vals.extend([sagittal_centroids[-1]] * (mvs.shape[2] - len(sagittal_vals)))
+    # for the last centroid onward we want to have the last sagittal centroid values
     coronal_vals.extend([coronal_centroids[-1]] * (mvs.shape[2] - len(coronal_vals)))
+    # same goes for coronal
     sagittal_vals = np.array(sagittal_vals)
     coronal_vals = np.array(coronal_vals)
     sagittal_vals = sagittal_vals.astype(int)
     coronal_vals = coronal_vals.astype(int)
-
+    assert len(coronal_vals) == mvs.shape[2], "Number of values for coronal/sagittal is not equal to z-dimension"
+    assert len(sagittal_vals) == mvs.shape[2], "Number of values for coronal/sagittal is not equal to z-dimension"
     return sagittal_vals, coronal_vals
 
 
