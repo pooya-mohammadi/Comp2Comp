@@ -366,6 +366,9 @@ class SpineMetricsSaver(InferenceClass):
 
 
 class SpineFindDicoms(InferenceClass):
+    """
+    Find the dicom files corresponding to the spine T12 - L5 levels. Then, sets it to dicom_files_names, names, etc.
+    """
     def __init__(self):
         super().__init__()
 

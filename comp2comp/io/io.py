@@ -177,6 +177,9 @@ class NiftiReader(InferenceClass):
                 NIBUtils.save_sample(os.path.join(segmentations_output_dir, "converted_dcm_multilevel.nii.gz"),
                                      arr,
                                      nib_img=img)
+                # setup z0 and z1
+                inference_pipeline.z0 = self.z0 or 0
+                inference_pipeline.z1 = self.z1 or arr.shape[-1]
             else:
                 shutil.copy(
                     self.input_path,

@@ -42,7 +42,11 @@ class MuscleAdiposeTissueVisualizer(InferenceClass):
 
     def __call__(self, inference_pipeline, images, results):
         self.output_dir = inference_pipeline.output_dir
-        self.dicom_file_names = inference_pipeline.dicom_file_names
+        if hasattr(inference_pipeline, "dicom_file_names"):
+            self.dicom_file_names = inference_pipeline.dicom_file_names
+        else:
+            # get indices!
+            self.dicom_file_names = [str(i) for i in range(inference_pipeline.z0, inference_pipeline.z1)]
         # if spine is an attribute of the inference pipeline, use it
         if not hasattr(inference_pipeline, "spine"):
             spine = False
@@ -132,8 +136,8 @@ class MuscleAdiposeTissueVisualizer(InferenceClass):
                 area_threshold=0,
             )
 
-            hu_val = round(result[tissue]["Hounsfield Unit"])
-            area_val = round(result[tissue]["Cross-sectional Area (cm^2)"])
+            hu_val = round(result[tissue]["Hounsfield Unit"], 2)
+            area_val = round(result[tissue]["Cross-sectional Area (cm^2)"], 2)
 
             vis.draw_text(
                 text=tissue,
@@ -144,7 +148,7 @@ class MuscleAdiposeTissueVisualizer(InferenceClass):
                     text_start_vertical_offset - self._MUSCLE_FAT_TEXT_VERTICAL_SPACING,
                 ),
                 color=color,
-                font_size=9,
+                font_size=7,
                 horizontal_alignment="center",
             )
 
@@ -157,7 +161,7 @@ class MuscleAdiposeTissueVisualizer(InferenceClass):
                     text_start_vertical_offset,
                 ),
                 color=color,
-                font_size=9,
+                font_size=7,
                 horizontal_alignment="center",
             )
             vis.draw_text(
@@ -169,7 +173,7 @@ class MuscleAdiposeTissueVisualizer(InferenceClass):
                     text_start_vertical_offset + self._MUSCLE_FAT_TEXT_VERTICAL_SPACING,
                 ),
                 color=color,
-                font_size=9,
+                font_size=7,
                 horizontal_alignment="center",
             )
 

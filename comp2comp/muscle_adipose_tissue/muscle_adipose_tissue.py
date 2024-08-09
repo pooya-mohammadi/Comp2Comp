@@ -336,7 +336,12 @@ class MuscleAdiposeTissueComputeMetrics(InferenceClass):
         return {"images": images, "results": results}
 
     def compute_metrics(self, img, mask, spacing):
-        """Compute results for a given segmentation."""
+        """Compute results for a given segmentation.
+        img: a slice of an image
+        mask: a slice of a mask -> mask is 3D. The last channel is responsible for number of classes.
+        Ex: {'muscle': 4, 'sat': 1, 'vat': 2, 'imat': 3}
+        spacing:
+        """
         categories = self.model_type.categories
 
         hu = HounsfieldUnits()

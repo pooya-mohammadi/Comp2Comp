@@ -52,9 +52,9 @@ def MuscleAdiposeTissuePipelineBuilder(args):
                 16, args.muscle_fat_model
             ),  # returns predictions !
             muscle_adipose_tissue.MuscleAdiposeTissuePostProcessing(),
-            muscle_adipose_tissue.MuscleAdiposeTissueComputeMetrics(),  # TODO: continue from here!
+            muscle_adipose_tissue.MuscleAdiposeTissueComputeMetrics(),
             muscle_adipose_tissue_visualization.MuscleAdiposeTissueVisualizer(),
-            muscle_adipose_tissue.MuscleAdiposeTissueH5Saver(),
+            muscle_adipose_tissue.MuscleAdiposeTissueH5Saver(),  # TODO: Continue from here
             muscle_adipose_tissue.MuscleAdiposeTissueMetricsSaver(),
         ]
     )

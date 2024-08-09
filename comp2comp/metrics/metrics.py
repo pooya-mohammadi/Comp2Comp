@@ -73,12 +73,16 @@ class Metric(Callable, ABC):
 
 
 class HounsfieldUnits(Metric):
+    """
+    Simply gets the mean of pixel/voxel values of the specific class!
+    """
     FULL_NAME = "Hounsfield Unit"
 
     def __init__(self, units="hu"):
         super().__init__(units)
 
     def __call__(self, mask, x, category_dim: int = None):
+
         mask = mask.astype(np.bool)
         if category_dim is None:
             return np.mean(x[mask])
@@ -93,6 +97,9 @@ class HounsfieldUnits(Metric):
 
 
 class CrossSectionalArea(Metric):
+    """
+    Calculates the number of voxels and multiplies it to the voxel value in the real world(np.prod(spacing))
+    """
     def __call__(self, mask, spacing=None, category_dim: int = None):
         pixel_area = np.prod(spacing) if spacing else 1
         mask = mask.astype(np.bool)
