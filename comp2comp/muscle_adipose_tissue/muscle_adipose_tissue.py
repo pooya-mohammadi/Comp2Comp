@@ -385,8 +385,13 @@ class MuscleAdiposeTissueH5Saver(InferenceClass):
         self.output_dir = inference_pipeline.output_dir
         self.h5_output_dir = os.path.join(self.output_dir, "segmentations")
         os.makedirs(self.h5_output_dir, exist_ok=True)
-        self.dicom_file_paths = inference_pipeline.dicom_file_paths
-        self.dicom_file_names = inference_pipeline.dicom_file_names
+        if hasattr(inference_pipeline, "dicom_file_names"):
+            self.dicom_file_names = inference_pipeline.dicom_file_names
+        else:
+            # get indices!
+            self.dicom_file_names = [str(i) for i in range(inference_pipeline.z0, inference_pipeline.z1)]
+        # self.dicom_file_paths = inference_pipeline.dicom_file_paths
+        # self.dicom_file_names = inference_pipeline.dicom_file_names
         self.save_results(results)
         return {"results": results}
 
@@ -418,14 +423,24 @@ class MuscleAdiposeTissueMetricsSaver(InferenceClass):
         self.output_dir = inference_pipeline.output_dir
         self.csv_output_dir = os.path.join(self.output_dir, "metrics")
         os.makedirs(self.csv_output_dir, exist_ok=True)
-        self.dicom_file_paths = inference_pipeline.dicom_file_paths
-        self.dicom_file_names = inference_pipeline.dicom_file_names
+        if hasattr(inference_pipeline, "dicom_file_names"):
+            self.dicom_file_names = inference_pipeline.dicom_file_names
+        else:
+            # get indices!
+            self.dicom_file_names = [str(i) for i in range(inference_pipeline.z0, inference_pipeline.z1)]
+        if hasattr(inference_pipeline, "dicom_file_paths"):
+            self.dicom_file_paths = inference_pipeline.dicom_file_paths
+        else:
+            # get indices!
+            self.dicom_file_paths = [str(i) for i in range(inference_pipeline.z0, inference_pipeline.z1)]
+        # self.dicom_file_paths = inference_pipeline.dicom_file_paths
+        # self.dicom_file_names = inference_pipeline.dicom_file_names
         self.save_results(results)
         return {}
 
     def save_results(self, results):
         """Save results to a CSV file."""
-        self.model_type.categories
+        # self.model_type.categories
         df = pd.DataFrame(
             columns=[
                 "Level",

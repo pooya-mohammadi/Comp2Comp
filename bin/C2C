@@ -54,7 +54,7 @@ def MuscleAdiposeTissuePipelineBuilder(args):
             muscle_adipose_tissue.MuscleAdiposeTissuePostProcessing(),
             muscle_adipose_tissue.MuscleAdiposeTissueComputeMetrics(),
             muscle_adipose_tissue_visualization.MuscleAdiposeTissueVisualizer(),
-            muscle_adipose_tissue.MuscleAdiposeTissueH5Saver(),  # TODO: Continue from here
+            muscle_adipose_tissue.MuscleAdiposeTissueH5Saver(),  # saves the mask in .h5 format :)
             muscle_adipose_tissue.MuscleAdiposeTissueMetricsSaver(),
         ]
     )
