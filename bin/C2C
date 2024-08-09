@@ -142,7 +142,10 @@ def AorticCalciumPipelineBuilder(path, args):
 
 
 def ContrastPhasePipelineBuilder(path, args):
-    pipeline = InferencePipeline([io.DicomToNifti(path), ContrastPhaseDetection(path)])
+    pipeline = InferencePipeline([
+        io.DicomToNifti(path) if args.input_type == "dicom" else io.NiftiReader(path),
+        ContrastPhaseDetection(path) # TODO: Continue from Here!
+    ])
     return pipeline
 
 
@@ -310,3 +313,4 @@ if __name__ == "__main__":
     main()
     # How to run: spine_muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
     # How to run: muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations --muscle_fat_model stanford_v0.0.2 --z0 238 --z1 250
+    # How to run: contrast_phase --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations

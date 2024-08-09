@@ -24,29 +24,24 @@ class ContrastPhaseDetection(InferenceClass):
     def __call__(self, inference_pipeline):
         self.output_dir = inference_pipeline.output_dir
         self.output_dir_segmentations = os.path.join(self.output_dir, "segmentations/")
-        if not os.path.exists(self.output_dir_segmentations):
-            os.makedirs(self.output_dir_segmentations)
+        os.makedirs(self.output_dir_segmentations, exist_ok=True)
         self.model_dir = inference_pipeline.model_dir
-
+        imgNiftiPath = os.path.join(self.output_dir_segmentations, "converted_dcm.nii.gz")
+        segNiftPath = os.path.join(self.output_dir_segmentations, "s01.nii.gz")
         seg, img = self.run_segmentation(
-            os.path.join(self.output_dir_segmentations, "converted_dcm.nii.gz"),
-            self.output_dir_segmentations + "s01.nii.gz",
-            inference_pipeline.model_dir,
+            input_path=imgNiftiPath,
+            output_path=segNiftPath,
+            # model_dir=inference_pipeline.model_dir,
         )
 
         # segArray, imgArray = self.convertNibToNumpy(seg, img)
-
-        imgNiftiPath = os.path.join(
-            self.output_dir_segmentations, "converted_dcm.nii.gz"
-        )
-        segNiftPath = os.path.join(self.output_dir_segmentations, "s01.nii.gz")
 
         predict_phase(segNiftPath, imgNiftiPath, outputPath=self.output_dir)
 
         return {}
 
     def run_segmentation(
-        self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir
+            self, input_path: Union[str, Path], output_path: Union[str, Path]
     ):
         """Run segmentation.
 
@@ -94,7 +89,7 @@ class ContrastPhaseDetection(InferenceClass):
                 verbose=False,
                 test=0,
             )
-        
+
         #  seg = totalsegmentator(
         #     input = os.path.join(self.output_dir_segmentations, "converted_dcm.nii.gz"),
         #     output = os.path.join(self.output_dir_segmentations, "segmentation.nii"),
@@ -126,7 +121,7 @@ class ContrastPhaseDetection(InferenceClass):
         end = time()
 
         # Log total time for spine segmentation
-        print(f"Total time for segmentation: {end-st:.2f}s.")
+        print(f"Total time for segmentation: {end - st:.2f}s.")
 
         # return seg, img
         return seg, img
