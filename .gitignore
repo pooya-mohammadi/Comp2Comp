@@ -72,3 +72,6 @@ comp2comp/preferences.yaml
 .idea
 nifti_samples
 dicom_data
+*.gz
+bin/*.jgp
+bin/*.png
