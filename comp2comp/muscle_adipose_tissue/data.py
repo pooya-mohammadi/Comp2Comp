@@ -1,10 +1,10 @@
 import math
 from typing import List, Sequence
 
-import keras.utils as k_utils
+# import keras.utils as k_utils
 import numpy as np
 import pydicom
-from keras.utils.data_utils import OrderedEnqueuer
+# from keras.utils.data_utils import OrderedEnqueuer
 from tqdm import tqdm
 
 
@@ -73,7 +73,8 @@ def _window(xs, bounds):
         return np.stack(imgs, axis=-1)
 
 
-class Dataset(k_utils.Sequence):
+class Dataset():
+# class Dataset(k_utils.Sequence):
     def __init__(self, files: List[str], batch_size: int = 16, windows=None):
         self._files = files
         self._batch_size = batch_size

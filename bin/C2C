@@ -34,12 +34,19 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 ### AAA Pipeline
 
 def AAAPipelineBuilder(path, args):
+    # They use the totalsegmentator version 2 for cropping but totalsegmentator version 1 for AortaSegmentation!
     pipeline = InferencePipeline(
         [
             # Reads the image, gets segmentation of vertebral bones, then crop the image based on required labels!
             AxialCropperPipelineBuilder(path, args),
-            aaa.AortaSegmentation(),  # segments spine. Super weird!
+            aaa.AortaSegmentation(),  # segments spine. Super weird! Even though it's called aorta segmentation :)
             aaa.AortaDiameter(),
+            # clips input ct_img between -300, 1800 :/
+            # On the contours of the mask(the one generated with aorta total segmentator 1-it only returns aorta!),
+            # they fit an ellipsis. The ellipsis is only used to draw the beautiful lines not for calculating the
+            # mass of the aorta and ...
+            # Actually, the diameter is taken from the ellipsis as well.
+
             aaa.AortaMetricsSaver()
         ]
     )
@@ -217,18 +224,18 @@ def argument_parser():
     )
 
     # muscle + fat
-    muscle_adipose_tissue_parser_ = subparsers.add_parser(
-        "muscle_adipose_tissue", parents=[base_parser]
-    )
-    muscle_adipose_tissue_parser_.add_argument(
-        "--muscle_fat_model", default="stanford_v0.0.2", type=str
-    )
-    muscle_adipose_tissue_parser_.add_argument(
-        "--z0", default=None, type=int
-    )
-    muscle_adipose_tissue_parser_.add_argument(
-        "--z1", default=None, type=int
-    )
+    # muscle_adipose_tissue_parser_ = subparsers.add_parser(
+    #     "muscle_adipose_tissue", parents=[base_parser]
+    # )
+    # muscle_adipose_tissue_parser_.add_argument(
+    #     "--muscle_fat_model_", default="stanford_v0.0.2", type=str, overrite=True
+    # )
+    # muscle_adipose_tissue_parser_.add_argument(
+    #     "--z0", default=None, type=int
+    # )
+    # muscle_adipose_tissue_parser_.add_argument(
+    #     "--z1", default=None, type=int
+    # )
 
     # Aortic calcium
     aortic_calcium = subparsers.add_parser(
@@ -253,12 +260,12 @@ def argument_parser():
     # AAA
     aorta_diameter_parser = subparsers.add_parser("aaa", help="aorta diameter", parents=[base_parser])
 
-    aorta_diameter_parser.add_argument(
-        "--aorta_model",
-        default="ts_spine",
-        type=str,
-        help="aorta model to use for inference",
-    )
+    # aorta_diameter_parser.add_argument(
+    #     "--aorta_model",
+    #     default="ts_spine",
+    #     type=str,
+    #     help="aorta model to use for inference",
+    # )
 
     aorta_diameter_parser.add_argument(
         "--spine_model",
@@ -292,6 +299,7 @@ def main():
     if args.pipeline == "spine_muscle_adipose_tissue":
         process_3d(args, SpineMuscleAdiposeTissuePipelineBuilder)
     elif args.pipeline == "muscle_adipose_tissue":
+        args.muscle_fat_model = args.muscle_fat_model_
         process_3d(args, MuscleAdiposeTissueFullPipelineBuilder)
     elif args.pipeline == "spine":
         process_3d(args, SpinePipelineBuilder)
@@ -314,6 +322,6 @@ def main():
 if __name__ == "__main__":
     main()
     # How to run: spine_muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
-    # How to run: muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations --muscle_fat_model stanford_v0.0.2 --z0 238 --z1 250
+    # How to run: muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations --muscle_fat_model_ stanford_v0.0.2 --z0 238 --z1 250
     # How to run: contrast_phase --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
     # How to run: aaa --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations

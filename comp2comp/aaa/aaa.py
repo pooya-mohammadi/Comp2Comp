@@ -36,7 +36,7 @@ class AortaSegmentation(InferenceClass):
 
         self.model_dir = inference_pipeline.model_dir
 
-        seg, medical_volume = self.spine_seg(
+        seg, medical_volume = self.aorta_seg(
             os.path.join(self.output_dir_segmentations, "converted_dcm.nii.gz"),
             self.output_dir_segmentations + "spine.nii.gz", inference_pipeline.model_dir,
         )
@@ -109,10 +109,10 @@ class AortaSegmentation(InferenceClass):
         else:
             print("Spine model already downloaded.")
 
-    def spine_seg(
+    def aorta_seg(
             self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir: Union[str, Path]
     ):
-        """Run spine segmentation.
+        """Run aorta segmentation.
 
         Args:
             input_path (Union[str, Path]): Input path.
@@ -175,7 +175,8 @@ class AortaDiameter(InferenceClass):
     def __init__(self):
         super().__init__()
 
-    def normalize_img(self, img: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def normalize_img(img: np.ndarray) -> np.ndarray:
         """Normalize the image.
         Args:
             img (np.ndarray): Input image.
@@ -199,7 +200,6 @@ class AortaDiameter(InferenceClass):
         output_dir_summary = os.path.join(output_dir, "images/summary/")
         os.makedirs(output_dir_summary, exist_ok=True)
         if hasattr(inference_pipeline, "dicom_series_path"):
-
             DICOM_PATH = inference_pipeline.dicom_series_path
             dicom = pydicom.dcmread(DICOM_PATH + "/" + os.listdir(DICOM_PATH)[0])
 
@@ -228,10 +228,11 @@ class AortaDiameter(InferenceClass):
             img = np.tile(img, (1, 1, 3))
 
             contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+            # they get the contours over each mask!
 
             if len(contours) != 0:
-                areas = [cv2.contourArea(c) for c in contours]
-                sorted_areas = np.sort(areas)
+                # areas = [cv2.contourArea(c) for c in contours]
+                # sorted_areas = np.sort(areas)
 
                 areas = [cv2.contourArea(c) for c in contours]
                 sorted_areas = np.sort(areas)
@@ -250,7 +251,7 @@ class AortaDiameter(InferenceClass):
 
                 cv2.ellipse(img, ellipse, (0, 255, 0), 1)
 
-                xc, yc = ellipse[0]
+                # xc, yc = ellipse[0]
                 cv2.circle(img, (int(xc), int(yc)), 5, (0, 0, 255), -1)
 
                 rmajor = max(d1, d2) / 2
@@ -262,7 +263,7 @@ class AortaDiameter(InferenceClass):
                     angle = angle - 90
                 else:
                     angle = angle + 90
-                print(angle)
+                print("ellipsis angle:", angle)
                 xtop = xc + math.cos(math.radians(angle)) * rmajor
                 ytop = yc + math.sin(math.radians(angle)) * rmajor
                 xbot = xc + math.cos(math.radians(angle + 180)) * rmajor

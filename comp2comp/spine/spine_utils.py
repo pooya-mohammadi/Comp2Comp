@@ -19,7 +19,7 @@ from comp2comp.spine import spine_visualization
 from deep_utils import NIBUtils
 import matplotlib
 
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 
