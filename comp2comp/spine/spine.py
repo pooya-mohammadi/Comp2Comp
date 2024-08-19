@@ -22,6 +22,7 @@ from comp2comp.models.models import Models
 from comp2comp.spine import spine_utils
 from comp2comp.visualization.dicom import to_dicom
 
+
 # from totalsegmentator.libs import (
 #     download_pretrained_weights,
 #     nostdout,
@@ -41,8 +42,8 @@ class SpineSegmentation(InferenceClass):
         # inference_pipeline.dicom_series_path = self.input_path
         self.output_dir = inference_pipeline.output_dir
         self.output_dir_segmentations = os.path.join(self.output_dir, "segmentations/")
-        if not os.path.exists(self.output_dir_segmentations):
-            os.makedirs(self.output_dir_segmentations)
+        # if not os.path.exists(self.output_dir_segmentations):
+        os.makedirs(self.output_dir_segmentations, exist_ok=True)
 
         self.model_dir = inference_pipeline.model_dir
 
@@ -142,7 +143,7 @@ class SpineSegmentation(InferenceClass):
                 out=os.path.join(download_dir, "fold_0.zip"),
             )
             with zipfile.ZipFile(
-                os.path.join(download_dir, "fold_0.zip"), "r"
+                    os.path.join(download_dir, "fold_0.zip"), "r"
             ) as zip_ref:
                 zip_ref.extractall(download_dir)
             os.remove(os.path.join(download_dir, "fold_0.zip"))
@@ -155,7 +156,7 @@ class SpineSegmentation(InferenceClass):
             print("Spine model already downloaded.")
 
     def spine_seg(
-        self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir
+            self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir
     ):
         """Run spine segmentation.
 
@@ -215,7 +216,7 @@ class SpineSegmentation(InferenceClass):
         end = time()
 
         # Log total time for spine segmentation
-        print(f"Total time for spine segmentation: {end-st:.2f}s.")
+        print(f"Total time for spine segmentation: {end - st:.2f}s.")
 
         if self.model_name == "stanford_spine_v0.0.1":
             seg_data = seg.get_fdata()
@@ -261,27 +262,26 @@ class AxialCropper(InferenceClass):
         """
         segmentation = inference_pipeline.segmentation
         segmentation_data = segmentation.get_fdata()
+
         try:
-            upper_level_index = np.where(segmentation_data == self.upper_level_index)[
-                2
-            ].max()
+            # nib data so z is index 2
+            upper_level_index = np.where(segmentation_data == self.upper_level_index)[2].max()
         except:
-            print(f"[WARNING] upper_level_dex: {self.upper_level_index} was not found! Setting to {segmentation_data.shape[2]}")
+            print(
+                f"[WARNING] upper_level_dex: {self.upper_level_index} was not found! Setting to {segmentation_data.shape[2]}")
             upper_level_index = segmentation_data.shape[2]
+
         try:
-            lower_level_index = np.where(segmentation_data == self.lower_level_index)[
-                2
-            ].min()
+            lower_level_index = np.where(segmentation_data == self.lower_level_index)[2].min()
         except:
             print(f"[WARNING] lower_level_index: {self.lower_level_index} was not found! Setting to 0")
             lower_level_index = 0
+
         segmentation = segmentation.slicer[:, :, lower_level_index:upper_level_index]
         inference_pipeline.segmentation = segmentation
 
         medical_volume = inference_pipeline.medical_volume
-        medical_volume = medical_volume.slicer[
-            :, :, lower_level_index:upper_level_index
-        ]
+        medical_volume = medical_volume.slicer[:, :, lower_level_index:upper_level_index]
         inference_pipeline.medical_volume = medical_volume
 
         if self.save:
@@ -369,6 +369,7 @@ class SpineFindDicoms(InferenceClass):
     """
     Find the dicom files corresponding to the spine T12 - L5 levels. Then, sets it to dicom_files_names, names, etc.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -498,4 +499,3 @@ class SpineMuscleAdiposeTissueReport(InferenceClass):
         im_cor.close()
         im_sag.close()
         new_im.close()
-

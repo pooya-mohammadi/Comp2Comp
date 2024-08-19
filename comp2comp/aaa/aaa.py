@@ -32,19 +32,17 @@ class AortaSegmentation(InferenceClass):
         # inference_pipeline.dicom_series_path = self.input_path
         self.output_dir = inference_pipeline.output_dir
         self.output_dir_segmentations = os.path.join(self.output_dir, "segmentations/")
-        if not os.path.exists(self.output_dir_segmentations):
-            os.makedirs(self.output_dir_segmentations)
+        os.makedirs(self.output_dir_segmentations, exist_ok=True)
 
         self.model_dir = inference_pipeline.model_dir
 
-        seg, mv = self.spine_seg(
+        seg, medical_volume = self.spine_seg(
             os.path.join(self.output_dir_segmentations, "converted_dcm.nii.gz"),
-            self.output_dir_segmentations + "spine.nii.gz",
-            inference_pipeline.model_dir,
+            self.output_dir_segmentations + "spine.nii.gz", inference_pipeline.model_dir,
         )
 
         seg = seg.get_fdata()
-        medical_volume = mv.get_fdata()
+        medical_volume = medical_volume.get_fdata()
 
         axial_masks = []
         ct_image = []
@@ -99,7 +97,7 @@ class AortaSegmentation(InferenceClass):
                 out=os.path.join(download_dir, "fold_0.zip"),
             )
             with zipfile.ZipFile(
-                os.path.join(download_dir, "fold_0.zip"), "r"
+                    os.path.join(download_dir, "fold_0.zip"), "r"
             ) as zip_ref:
                 zip_ref.extractall(download_dir)
             os.remove(os.path.join(download_dir, "fold_0.zip"))
@@ -112,13 +110,14 @@ class AortaSegmentation(InferenceClass):
             print("Spine model already downloaded.")
 
     def spine_seg(
-        self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir
+            self, input_path: Union[str, Path], output_path: Union[str, Path], model_dir: Union[str, Path]
     ):
         """Run spine segmentation.
 
         Args:
             input_path (Union[str, Path]): Input path.
             output_path (Union[str, Path]): Output path.
+            model_dir (Union[str, Path]): Path to model
         """
 
         print("Segmenting spine...")
@@ -164,7 +163,7 @@ class AortaSegmentation(InferenceClass):
         end = time()
 
         # Log total time for spine segmentation
-        print(f"Total time for spine segmentation: {end-st:.2f}s.")
+        print(f"Total time for spine segmentation: {end - st:.2f}s.")
 
         seg_data = seg.get_fdata()
         seg = nib.Nifti1Image(seg_data, seg.affine, seg.header)
@@ -186,34 +185,34 @@ class AortaDiameter(InferenceClass):
         return (img - img.min()) / (img.max() - img.min())
 
     def __call__(self, inference_pipeline):
-        axial_masks = (
-            inference_pipeline.axial_masks
-        )  # list of 2D numpy arrays of shape (512, 512)
-        ct_img = (
-            inference_pipeline.ct_image
-        )  # 3D numpy array of shape (512, 512, num_axial_slices)
+        axial_masks = inference_pipeline.axial_masks
+        # list of 2D numpy arrays of shape (512, 512)
+        ct_img = inference_pipeline.ct_image
+        # 3D numpy array of shape (512, 512, num_axial_slices)
 
         # image output directory
         output_dir = inference_pipeline.output_dir
         output_dir_slices = os.path.join(output_dir, "images/slices/")
-        if not os.path.exists(output_dir_slices):
-            os.makedirs(output_dir_slices)
+        os.makedirs(output_dir_slices, exist_ok=True)
 
         output_dir = inference_pipeline.output_dir
         output_dir_summary = os.path.join(output_dir, "images/summary/")
-        if not os.path.exists(output_dir_summary):
-            os.makedirs(output_dir_summary)
+        os.makedirs(output_dir_summary, exist_ok=True)
+        if hasattr(inference_pipeline, "dicom_series_path"):
 
-        DICOM_PATH = inference_pipeline.dicom_series_path
-        dicom = pydicom.dcmread(DICOM_PATH + "/" + os.listdir(DICOM_PATH)[0])
+            DICOM_PATH = inference_pipeline.dicom_series_path
+            dicom = pydicom.dcmread(DICOM_PATH + "/" + os.listdir(DICOM_PATH)[0])
 
-        dicom.PhotometricInterpretation = "YBR_FULL"
-        pixel_conversion = dicom.PixelSpacing
+            dicom.PhotometricInterpretation = "YBR_FULL"
+            pixel_conversion = dicom.PixelSpacing
+        else:
+            pixel_conversion = inference_pipeline.medical_volume.header.get_zooms()[:2]
+
         print("Pixel conversion: " + str(pixel_conversion))
         RATIO_PIXEL_TO_MM = pixel_conversion[0]
 
-        SLICE_COUNT = dicom["InstanceNumber"].value
-        print(SLICE_COUNT)
+        # SLICE_COUNT = dicom["InstanceNumber"].value
+        # print(SLICE_COUNT)
 
         SLICE_COUNT = len(ct_img)
         diameterDict = {}
@@ -347,7 +346,7 @@ class AortaDiameter(InferenceClass):
 
         img = ct_img[
             SLICE_COUNT - (max(diameterDict.items(), key=operator.itemgetter(1))[0])
-        ]
+            ]
         img = np.clip(img, -300, 1800)
         img = self.normalize_img(img) * 255.0
         img = img.reshape((img.shape[0], img.shape[1], 1))
@@ -408,7 +407,10 @@ class AortaMetricsSaver(InferenceClass):
     def __call__(self, inference_pipeline):
         """Save metrics to a CSV file."""
         self.max_diameter = inference_pipeline.max_diameter
-        self.dicom_series_path = inference_pipeline.dicom_series_path
+        if hasattr(inference_pipeline, "dicom_series_path"):
+            self.input_path = inference_pipeline.dicom_series_path
+        else:
+            self.input_path = inference_pipeline.input_path
         self.output_dir = inference_pipeline.output_dir
         self.csv_output_dir = os.path.join(self.output_dir, "metrics")
         if not os.path.exists(self.csv_output_dir):
@@ -418,7 +420,7 @@ class AortaMetricsSaver(InferenceClass):
 
     def save_results(self):
         """Save results to a CSV file."""
-        _, filename = os.path.split(self.dicom_series_path)
+        _, filename = os.path.split(self.input_path)
         data = [[filename, str(self.max_diameter)]]
         df = pd.DataFrame(data, columns=["Filename", "Max Diameter"])
         df.to_csv(os.path.join(self.csv_output_dir, "aorta_metrics.csv"), index=False)

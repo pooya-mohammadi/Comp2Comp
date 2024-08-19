@@ -144,6 +144,7 @@ class NiftiReader(InferenceClass):
             return {}
         if hasattr(inference_pipeline, "medical_volume"):
             return {}
+        inference_pipeline.input_path = self.input_path
         output_dir = inference_pipeline.output_dir
         segmentations_output_dir = os.path.join(output_dir, "segmentations")
         os.makedirs(segmentations_output_dir, exist_ok=True)

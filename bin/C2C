@@ -36,8 +36,9 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 def AAAPipelineBuilder(path, args):
     pipeline = InferencePipeline(
         [
+            # Reads the image, gets segmentation of vertebral bones, then crop the image based on required labels!
             AxialCropperPipelineBuilder(path, args),
-            aaa.AortaSegmentation(),
+            aaa.AortaSegmentation(),  # segments spine. Super weird!
             aaa.AortaDiameter(),
             aaa.AortaMetricsSaver()
         ]
@@ -89,10 +90,11 @@ def SpinePipelineBuilder(path, args):
 def AxialCropperPipelineBuilder(path, args):
     pipeline = InferencePipeline(
         [
-            io.DicomToNifti(path, "aaa"),
-            spine.SpineSegmentation(args.spine_model),
+            # io.DicomToNifti(path, "aaa"),
+            io.DicomToNifti(path, "aaa") if args.input_type == "dicom" else io.NiftiReader(path, pipeline_name="aaa"),
+            spine.SpineSegmentation(args.spine_model),  # spine segmentation using total segmentator
             orientation.ToCanonical(),
-            spine.AxialCropper(lower_level="L5", upper_level="L1", save=True),
+            spine.AxialCropper(lower_level="L5", upper_level="L1", save=True),  # crops based the vertebral labels
         ]
     )
     return pipeline
@@ -144,7 +146,7 @@ def AorticCalciumPipelineBuilder(path, args):
 def ContrastPhasePipelineBuilder(path, args):
     pipeline = InferencePipeline([
         io.DicomToNifti(path) if args.input_type == "dicom" else io.NiftiReader(path),
-        ContrastPhaseDetection(path) # TODO: Continue from Here!
+        ContrastPhaseDetection(path)  # TODO: Continue from Here!
     ])
     return pipeline
 
@@ -314,3 +316,4 @@ if __name__ == "__main__":
     # How to run: spine_muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
     # How to run: muscle_adipose_tissue --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations --muscle_fat_model stanford_v0.0.2 --z0 238 --z1 250
     # How to run: contrast_phase --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
+    # How to run: aaa --input_path /home/aicvi/projects/Comp2Comp/nifti_samples/samples_1.nii.gz --input_type nifti --save_segmentations
